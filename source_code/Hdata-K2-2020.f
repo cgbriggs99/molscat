@@ -13,10 +13,11 @@ C
       implicit none
 C
       if (allocated(potnam)) deallocate (potnam)
-      allocate (character(72) :: potnam)
+      allocate (character(128) :: potnam)
 
       POTNAM =
-     X ' K2 potential from Tiemann et al., doi: https://doi.org/10.1103/PhysRevResearch.2.013366'
+     X ' K2 potential from Tiemann et al., &
+     doi: https://doi.org/10.1103/PhysRevResearch.2.013366'
 C
 C  PRINT CONTROL (FOR POTENTIAL ROUTINE ONLY)
 C  0 = SILENT, 1 = TITLE, 2 = INTERNALLY CALCULATED PARAMETERS
@@ -34,8 +35,8 @@ C
       allocate (a(0:maxval(na)-1,2))
 
       A = RESHAPE((/
-     X -4450.9007703,
-     X  0.159877863995326747,
+     X -4450.9007703d0,
+     X  0.159877863995326747d0,
      X  0.141337574101676037d5,
      X  0.107669620493846905d5,
      X -0.331314023322698995d4,
@@ -58,8 +59,8 @@ C
      X -0.314874358611015789d7,
      X  0.324661526246530302d8,
 
-     a -255.0214692,
-     a -0.013405598929310479,
+     a -255.0214692d0,
+     a -0.013405598929310479d0,
      a  0.153940442323125171d4,
      a -0.626944977828736569d3,
      a -0.147039918194012284d4,
