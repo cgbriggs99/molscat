@@ -118,7 +118,7 @@ $(addprefix $(OBJDIR)/,$(sizes_DEPS)): sizes.mod $(OBJDIR)/sizes_module.o
 # the object files in the list of prerequisites.
 #
 # Object codes that reference the pot_data_hannover module
-pot_data_hannover_DEPS = Hdata-Rb2-2010.o vstar-Hannover.o
+pot_data_hannover_DEPS = Hdata-Rb2-2010.o Hdata-K2-2020.o vstar-Hannover.o
 
 $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDIR)/Hannover_module.o
 
@@ -235,6 +235,7 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
  V-Mg+NH   = vstar-Mg_NH.o $(VRTP-DUM)
  
  DATA-RB2-Hann-2010 = Hdata-Rb2-2010.o
+ DATA-K2-Hann-2020 = Hdata-K2-2020.o
  
  EXTPOT-Rg+HX     = extpot-Rg_HX.o $(DAMP) $(SUMLEG)
  
@@ -246,6 +247,7 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
  POT-RGH2  = potenl-Rg_H2.o $(POTUTILS)
  
  POT-RB2_Hann-2010 = $(POTENL-GP) $(V-Hann) $(DATA-RB2-Hann-2010)
+ POT-K2_Hann-2020 = $(POTENL-GP) $(V-Hann) $(DATA-K2-Hann-2020)
 
 #
 # dependency lists for plug-in basis-set suites ===============================
@@ -279,6 +281,12 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
                        $(POT-RB2_Hann-2010)
  field-Rb2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-RB2_Hann-2010)
+ molscat-Rb2_OBJS    = $(CORE_MOL) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-K2_Hann-2020)
+ bound-Rb2_OBJS      = $(CORE_BD)  $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-K2_Hann-2020)
+ field-Rb2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-K2_Hann-2020)
 #
 # list of executables
 #
@@ -289,7 +297,8 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
                 molscat-H2_H2 bound-H2_H2 \
                 molscat-Rg_H2 bound-Rg_H2 \
                 molscat-Mg_NH bound-Mg_NH field-Mg_NH \
-                molscat-Rb2 bound-Rb2 field-Rb2
+                molscat-Rb2 bound-Rb2 field-Rb2 \
+                molscat-K2 bound-K2 field-K2
  
  PROGS += $(PUBLIC-PROGS)
 
