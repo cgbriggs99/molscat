@@ -1,2 +1,4 @@
 bin/*
 object-fortran/*
+*.mod
+*.o
