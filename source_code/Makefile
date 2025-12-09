@@ -88,7 +88,7 @@ $(addprefix $(OBJDIR)/,$(pair_state_DEPS)): pair_state.mod $(OBJDIR)/pair_state_
 physical_constants_DEPS = base9-1S_3Sigma_cpld.o                               \
       base9-alk_alk_ucpld.o bd.driver.o chckru.o eavg.o ecnv.o                 \
       extpot-Ar_CH4.o extpot-Ar_CO2.o extpot-Rg_HX.o fld.driver.o              \
-      Hannover_module.o Hdata-Rb2-2010.o mol.driver.o surbas.o                 \
+      Hannover_module.o Hdata-Rb2-2010.o Hdata-K2-2020.o mol.driver.o surbas.o                 \
       vstar-Hannover.o
 
 $(addprefix $(OBJDIR)/,$(physical_constants_DEPS)): physical_constants.mod $(OBJDIR)/physical_constants_module.o
@@ -281,11 +281,11 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
                        $(POT-RB2_Hann-2010)
  field-Rb2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-RB2_Hann-2010)
- molscat-Rb2_OBJS    = $(CORE_MOL) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+ molscat-K2_OBJS    = $(CORE_MOL) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-K2_Hann-2020)
- bound-Rb2_OBJS      = $(CORE_BD)  $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+ bound-K2_OBJS      = $(CORE_BD)  $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-K2_Hann-2020)
- field-Rb2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+ field-K2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-K2_Hann-2020)
 #
 # list of executables
