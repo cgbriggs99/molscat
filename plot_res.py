@@ -37,6 +37,7 @@ def plot_file(fname, channel) :
     data = []
     with open(fname, "r") as fp :
         data = list(find_values(fp, channel))
+    print(data)
     X = [d[0] for d in data]
     Y1 = [d[4] for d in data]
     Y2 = [d[5].real for d in data]
