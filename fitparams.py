@@ -212,12 +212,12 @@ def long_aexc_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, be
         -2 * sum(r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
     
 def long_gamma_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return 2 * sum(a * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(a * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+    return 2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
 
 def long_beta_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return -2 * sum(a * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        2 * sum(a * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+    return -2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
     
 def long_deriv(dists, singlet, triplet, x) :
     return [long_u_inf_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]), 
@@ -236,7 +236,7 @@ def long_calc_params(dists, singlet, triplet, guess_x = [0, 86.22129257781994, 2
     return res.x
 
 # First, calculate the energy at infinite separation.
-method = "ci6/cc-pVTZ"
+method = "ccsd(t)/cc-pVTZ"
 
 molecule Li {
     0 2
@@ -248,7 +248,7 @@ set MAXITER 10000
 set RESTART False
 set CI_NUM_THREADS 8
 
-E_inf = 2 * energy("cisdt/cc-pVTZ", molecule = Li)
+E_inf = 2 * energy("ccsd(t)/cc-pVTZ", molecule = Li)
 
 clean()
 
@@ -362,7 +362,7 @@ set REFERENCE ROHF
 set SCF_TYPE PK
 
 print(f"Calculating triplet short range:")
-__short_t_dists = np.linspace(0.1, 2.0, 50)
+__short_t_dists = np.linspace(0.1, 3.0, 50)
 __short_t_energies = []
 
 for dist in __short_t_dists :
@@ -376,7 +376,7 @@ print("Optimizing parameters.")
 # t_a, short_t_b = short_find_ab(method, tLi2, t_rin, E_inf, 6)
 # t_ns = 6
 
-t_rin, t_a, short_t_b, t_ns = short_optimize_all(method, tLi2, __short_t_dists, __short_t_energies, E_inf, 2, -0.7009379657e3 / 219474.6, 0.80690073665e7 / 219474.6, 6, True)
+t_rin, t_a, short_t_b, t_ns = short_optimize_all(method, tLi2, __short_t_dists, __short_t_energies, E_inf, 1.6, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, True)
 
 print(f"Realculating triplet short range points for plotting:")
 __short_t_dists = np.linspace(0.2, t_rin, 20)
