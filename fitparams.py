@@ -2,6 +2,7 @@ import numpy as np
 import math
 import scipy
 import matplotlib.pyplot as plot
+import gc
 
 def form_matrix(terms, dists, brm, rm) :
     mat = np.zeros([terms, terms], dtype=float)
@@ -184,59 +185,60 @@ def short_optimize_all(method, molecule, dists, energies, e_inf, rin_start, a_st
             raise RuntimeError("Could not optimize parameters!")
         return result.x[0], result.x[1], result.x[2], ns_start
 
-def long_loss(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, singlet)) / len(dists) + \
-        sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, triplet)) / len(dists)
+def long_loss(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, singlet)) / len(dists) + \
+        sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
 def long_energy(r, u_inf, c6, c8, c10, aexc, gamma, beta) :
     return u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r)
 
-def long_u_inf_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return 2 * sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        2 * sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_u_inf_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (2 * sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        2 * sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_c6_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return -2 * sum(r ** -6 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(r ** -6 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_c6_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (-2 * sum(r ** -6 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(r ** -6 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_c8_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return -2 * sum(r ** -8 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(r ** -8 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_c8_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (-2 * sum(r ** -8 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(r ** -8 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_c10_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return -2 * sum(r ** -10 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(r ** -10 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_c10_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (-2 * sum(r ** -10 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(r ** -10 * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_aexc_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return 2 * sum(r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_aexc_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (2 * sum(r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
     
-def long_gamma_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return 2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        -2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_gamma_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        -2 * sum(aexc * math.log(r) * r ** gamma * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_beta_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return -2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
-        2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)
+def long_beta_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
+    return (-2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
+        2 * sum(aexc * r ** (gamma + 1) * math.exp(-beta * r) * (u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, triplet)) / len(dists)) / sstot
     
-def long_deriv(dists, singlet, triplet, x) :
-    return [long_u_inf_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]), 
-            long_c6_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]),
-            long_c8_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]),
-            long_c10_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]),
-            long_aexc_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]),
-            long_gamma_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]),
-            long_beta_deriv(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6])]
+def long_deriv(dists, singlet, triplet, x, sstot = 1) :
+    return [long_c6_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
+            long_c8_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2],  x[3], x[4], x[5], sstot),
+            long_c10_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
+            long_aexc_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
+            long_gamma_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
+            long_beta_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
+            long_u_inf_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot)]
         
-def long_calc_params(dists, singlet, triplet, guess_x = [0, 86.22129257781994, 2600.209558645966, 84430.85076815267, 0.04104901387222029, 5.19500, 2.13539], conv = 1e-8) :
-    res = scipy.optimize.minimize(lambda x: long_loss(dists, singlet, triplet, x[0], x[1], x[2], x[3], x[4], x[5], x[6]), guess_x, jac = lambda x: long_deriv(dists, singlet, triplet, x), tol = conv)
+def long_calc_params(dists, singlet, triplet, guess_x = [5428503.2154132845 / 219474.6, 285656172.4842383 / 219474.6, -7190999590.808121 / 219474.6, 3.0148368501773444 / 219474.6, 0.3192630859641754, 0.024698827557300147], conv = 1e-8, sstot = 1) :
+    res = scipy.optimize.least_squares(lambda x: [long_energy(r, 0, x[0], x[1], x[2], x[3], x[4], x[5]) - e for r, e in zip(dists, singlet)] + [long_energy(r, 0, x[0], x[1], x[2], -x[3], x[4], x[5]) - e for r, e in zip(dists, triplet)], guess_x, method = "lm") #, tol=conv) jac = lambda x: long_deriv(dists, singlet, triplet, x, sstot))
 
     if not res.success :
         raise ArithmeticError("Could not converge!")
     return res.x
 
 # First, calculate the energy at infinite separation.
-method = "ccsd(t)/cc-pVTZ"
+singlet_method = "psimrcc/cc-pVTZ"
+triplet_method = "psimrcc/cc-pVTZ"
 
 molecule Li {
     0 2
@@ -244,9 +246,17 @@ molecule Li {
 }
 set REFERENCE ROHF
 set SCF_TYPE PK
-set MAXITER 10000
-set RESTART False
-set CI_NUM_THREADS 8
+set MAXITER 100
+
+set PSIMRCC {
+    corr_wfn ccsd_t
+    frozen_docc [0, 0, 0, 0, 0, 0, 0, 0]
+    restricted_docc [1, 0, 0, 0, 0, 1, 0, 0]
+    active [1, 0, 0, 0, 0, 1, 0, 0]
+    frozen_uocc [0, 0, 0, 0, 0, 0, 0, 0]
+    wfn_sym Ag
+    corr_multp 1
+}
 
 E_inf = 2 * energy("ccsd(t)/cc-pVTZ", molecule = Li)
 
@@ -265,39 +275,57 @@ set REFERENCE RHF
 set SCF_TYPE PK
 
 sLi2.R = 2.6
-optimize(method, molecule = sLi2)
+optimize("ccsd(t)/cc-pVTZ", molecule = sLi2)
 
 clean()
 
 guess_rm = sLi2.R
-assert(guess_rm != 3)
+
+print(f"Finding zero point for singlet:")
+def singlet_func(R) :
+    sLi2.R = R
+    return energy(singlet_method, molecule = sLi2) - E_inf
+
+def singlet_grad(R) :
+    sLi2.R = R
+    G = gradient(singlet_method, molecule = sLi2)
+    return np.array(G)[0]
+
+result = scipy.optimize.root_scalar(singlet_func, bracket = (0.5, 2.0), fprime = singlet_grad, x0 = 1.6)
+gc.collect()
 
 print(f"Calculating singlet short range:")
-__short_s_dists = np.linspace(0.1, 2, 100)
+__short_s_dists = np.linspace(0.1, result.root, 20)
 __short_s_energies = []
 
-for dist in __short_s_dists :
-    sLi2.R = dist
-    __short_s_energies.append((energy(method, molecule=sLi2) - E_inf))
+# for dist in __short_s_dists :
+#     sLi2.R = dist
+#     __short_s_energies.append((energy(singlet_method, molecule=sLi2) - E_inf))
+#     clean()
 
-clean()
-print("Optimizing parameters.")
+# gc.collect()
+
+# print("Optimizing parameters.")
 
 # s_rin = short_find_rin(method, sLi2, __short_s_dists, __short_s_energies, 1.6, E_inf, 0)
 # s_ns, s_a, short_s_b = short_find_params(method, sLi2, s_rin, E_inf)
 # s_a, short_s_b = short_find_ab(method, sLi2, s_rin, E_inf, 12)
 # s_ns = 12
-s_rin, s_a, short_s_b, s_ns = short_optimize_all(method, sLi2, __short_s_dists, __short_s_energies, E_inf, 1.7, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, True)
+# s_rin, s_a, short_s_b, s_ns = short_optimize_all(singlet_method, sLi2, __short_s_dists, __short_s_energies, E_inf, result.root, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, True)
+s_rin = result.root
+s_ns = 1.5
+s_a, short_s_b = short_find_ab(singlet_method, sLi2, s_rin, E_inf, s_ns)
 
-print(f"Realculating singlet short range points for plotting:")
-__short_s_dists = np.linspace(0.1, s_rin, 20)
-__short_s_energies = []
+# print(f"Realculating singlet short range points for plotting:")
+# __short_s_dists = np.linspace(0.1, s_rin, 20)
+# __short_s_energies = []
 
 for dist in __short_s_dists :
     sLi2.R = dist
-    __short_s_energies.append((energy(method, molecule=sLi2) - E_inf))
+    __short_s_energies.append((energy(singlet_method, molecule=sLi2) - E_inf))
+    clean()
 
-clean()
+gc.collect()
 
 print(f"short R (å): {__short_s_dists}")
 print(f"singlet short energy (Eh): {__short_s_energies}")
@@ -314,14 +342,15 @@ print(f"R^2 fit: {1 - short_loss(__short_s_dists, __short_s_energies, s_a, short
 F_singlet_short = [s_a + short_s_b * r ** -s_ns for r in __short_s_dists]
 
 print("Calculating singlet medium range: ")
-__med_s_dists = np.linspace(s_rin, 6.0, 100)
+__med_s_dists = np.linspace(s_rin, 10.0, 50)
 __med_s_energies = []
 
 for dist in __med_s_dists :
     sLi2.R = dist
-    __med_s_energies.append((energy(method, molecule=sLi2) - E_inf))
+    __med_s_energies.append((energy(singlet_method, molecule=sLi2) - E_inf))
+    clean()
 
-clean()
+gc.collect()
 
 print(f"singlet medium R (å): {__med_s_dists}")
 print(f"singlet medium energy (Eh): {__med_s_energies}")
@@ -339,13 +368,14 @@ print(f"R^2 fit: {1 - calc_loss(terms, __med_s_dists, __med_s_energies, coefs, b
 
 print(f"Calculating singlet long range: ")
 
-__long_dists = np.linspace(8.0, 50, 20)
+__long_dists = np.linspace(10.0, 15, 50)
 __long_s_energies = []
 for dist in __long_dists :
     sLi2.R = dist
-    __long_s_energies.append(energy(method, molecule = sLi2) - E_inf)
+    __long_s_energies.append((energy(singlet_method, molecule = sLi2) - E_inf))
+    clean()
 
-clean()
+gc.collect()
 
 print(f"long R (å): {__long_dists}")
 print(f"singlet long energy (Eh): {__long_s_energies}")
@@ -361,30 +391,67 @@ molecule tLi2 {
 set REFERENCE ROHF
 set SCF_TYPE PK
 
+set PSIMRCC {
+    corr_wfn ccsd_t
+    frozen_docc [0, 0, 0, 0, 0, 0, 0, 0]
+    restricted_docc [1, 0, 0, 0, 0, 1, 0, 0]
+    active [1, 0, 0, 0, 0, 1, 0, 0]
+    frozen_uocc [0, 0, 0, 0, 0, 0, 0, 0]
+    wfn_sym B1u
+    corr_multp 3
+}
+
 print(f"Calculating triplet short range:")
-__short_t_dists = np.linspace(0.1, 3.0, 50)
-__short_t_energies = []
+# __short_t_dists = np.linspace(0.1, 3.0, 50)
+# __short_t_energies = []
 
-for dist in __short_t_dists :
-    tLi2.R = dist
-    __short_t_energies.append((energy(method, molecule=tLi2) - E_inf))
+# for dist in __short_t_dists :
+#     tLi2.R = dist
+#     __short_t_energies.append((energy(triplet_method, molecule=tLi2) - E_inf))
+#     clean()
 
-clean()
-print("Optimizing parameters.")
+# gc.collect()
+
+# print("Optimizing parameters.")
 
 # t_rin = short_find_rin(method, tLi2, __short_t_dists, __short_t_energies, 1.6, E_inf, 6)
 # t_a, short_t_b = short_find_ab(method, tLi2, t_rin, E_inf, 6)
 # t_ns = 6
 
-t_rin, t_a, short_t_b, t_ns = short_optimize_all(method, tLi2, __short_t_dists, __short_t_energies, E_inf, 1.6, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, True)
+# t_rin, t_a, short_t_b, t_ns = short_optimize_all(triplet_method, tLi2, __short_t_dists, __short_t_energies, E_inf, 2.87, -220564.8792037539 / 219474.6, 282876.41010192625 / 219474.6, 1.4505626355000991, True)
 
-print(f"Realculating triplet short range points for plotting:")
+tLi2.R = 3
+optimize("ccsd(t)/cc-pVTZ", molecule = tLi2)
+
+guess_rm = tLi2.R
+
+print(f"Finding zero point for triplet:")
+def triplet_func(R) :
+    tLi2.R = R
+    return energy(triplet_method, molecule = tLi2) - E_inf
+
+def triplet_grad(R) :
+    tLi2.R = R
+    G = gradient(singlet_method, molecule = tLi2)
+    return np.array(G)[0]
+
+result = scipy.optimize.root_scalar(triplet_func, bracket = (0.5, 4.0), fprime = triplet_grad, x0 = 1.6)
+gc.collect()
+
+t_rin = result.root
+t_ns = 1.5
+t_a, short_t_b = short_find_ab(triplet_method, tLi2, t_rin, E_inf, t_ns)
+
+# print(f"Realculating triplet short range points for plotting:")
 __short_t_dists = np.linspace(0.2, t_rin, 20)
 __short_t_energies = []
 
 for dist in __short_t_dists :
     tLi2.R = dist
-    __short_t_energies.append((energy(method, molecule=tLi2) - E_inf))
+    __short_t_energies.append((energy(triplet_method, molecule=tLi2) - E_inf))
+    clean()
+
+gc.collect()
 
 print(f"triplet short R (å): {__short_t_dists}")
 print(f"triplet short energy (Eh): {__short_t_energies}")
@@ -399,19 +466,20 @@ print(f"Ns: {t_ns}")
 print(f"R^2 fit: {1 - short_loss(__short_t_dists, __short_t_energies, t_a, short_t_b, t_ns) / sstot}")
 
 print("Calculating triplet medium range: ")
-__med_t_dists = np.linspace(t_rin, 8.0, 100)
+__med_t_dists = np.linspace(t_rin, 10.0, 50)
 __med_t_energies = []
 
 for dist in __med_t_dists :
     tLi2.R = dist
-    __med_t_energies.append((energy(method, molecule=tLi2) - E_inf))
+    __med_t_energies.append((energy(triplet_method, molecule=tLi2) - E_inf))
+    clean()
 
-clean()
+gc.collect()
 
 print(f"medium R (å): {__med_t_dists}")
 print(f"triplet medium energy (Eh): {__med_t_energies}")
 
-t_terms, t_b, t_rm, t_coefs = find_min_terms(10, __med_t_dists, __med_t_energies, -0.13, 2.673, cutoff = 1e-5, conv = 1e-6, max_iters=1000)
+t_terms, t_b, t_rm, t_coefs = find_min_terms(10, __med_t_dists, __med_t_energies, -0.13, guess_rm, cutoff = 1e-3, conv = 1e-5, max_iters=1000)
 
 average_e = sum(__med_t_energies) / len(__med_t_energies)
 sstot = sum((e - average_e) ** 2 for e in __med_t_energies) / len(__med_t_energies)
@@ -420,16 +488,17 @@ print(f"terms: {t_terms}")
 print(f"b (dimensionless): {t_b}")
 print(f"rm (å): {t_rm}")
 print(f"coefs (cm^-1): {list(map(lambda x: 219474.6 * float(x), t_coefs))}")
-print(f"R^2 fit: {1 - calc_loss(t_terms, __med_t_dists, __med_t_energies, coefs, t_b * t_rm, t_rm) / sstot}")
+print(f"R^2 fit: {1 - calc_loss(t_terms, __med_t_dists, __med_t_energies, t_coefs, t_b * t_rm, t_rm) / sstot}")
 
 print(f"Calculating triplet long range: ")
 
 __long_t_energies = []
 for dist in __long_dists :
     tLi2.R = dist
-    __long_t_energies.append(energy(method, molecule = tLi2) - E_inf)
+    __long_t_energies.append((energy(triplet_method, molecule = tLi2) - E_inf))
+    clean()
 
-clean()
+gc.collect()
 
 print(f"long R (å): {__long_dists}")
 print(f"triplet long energy (Eh): {__long_s_energies}")
@@ -437,7 +506,9 @@ print(f"triplet long energy (Eh): {__long_s_energies}")
 average_e = (sum(__long_t_energies) + sum(__long_s_energies)) / (len(__long_t_energies) + len(__long_s_energies))
 sstot = (sum((e - average_e) ** 2 for e in __long_t_energies) + sum((e - average_e) ** 2 for e in __long_s_energies)) / (len(__long_t_energies) + len(__long_s_energies))
 
-[u_inf, c6, c8, c10, aexc, gamma, beta] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies)
+u_inf = 0
+
+[c6, c8, c10, aexc, gamma, beta] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies)
 
 print(f"U_inf (cm^-1): {219474.6 * u_inf}")
 print(f"C6 (cm^-1 å^6): {219474.6 * c6}")
@@ -449,39 +520,39 @@ print(f"beta (å^-1): {beta}")
 print(f"R^2 fit: {1 - long_loss(__long_dists, __long_s_energies, __long_t_energies, u_inf, c6, c8, c10, aexc, gamma, beta) / sstot}")
 
 #Plotting
-X_singlet = list(__short_s_dists) + list(__med_s_dists) + list(__long_dists)
-Y_singlet = list(__short_s_energies) + list(__med_s_energies) + list(__long_s_energies)
-F_singlet_short = [s_a + short_s_b * r ** -s_ns for r in __short_s_dists]
-F_singlet_med = [calc_energy(r, terms, coefs, b * rm, rm) for r in __med_s_dists]
+# X_singlet = list(__short_s_dists) + list(__med_s_dists) + list(__long_dists)
+# Y_singlet = list(__short_s_energies) + list(__med_s_energies) + list(__long_s_energies)
+# F_singlet_short = [s_a + short_s_b * r ** -s_ns for r in __short_s_dists]
+# F_singlet_med = [calc_energy(r, terms, coefs, b * rm, rm) for r in __med_s_dists]
 F_singlet_long = [long_energy(r, u_inf, c6, c8, c10, aexc, gamma, beta) for r in __long_dists]
-F_singlet = F_singlet_short + F_singlet_med + F_singlet_long
+# F_singlet = F_singlet_short + F_singlet_med + F_singlet_long
 
-X_triplet = list(__short_t_dists) + list(__med_t_dists) + list(__long_dists)
-Y_triplet = list(__short_t_energies) + list(__med_t_energies) + list(__long_t_energies)
-F_triplet_short = [t_a + short_t_b * r ** -t_ns for r in __short_t_dists]
-F_triplet_med = [calc_energy(r, t_terms, t_coefs, t_b * t_rm, t_rm) for r in __med_t_dists]
+# X_triplet = list(__short_t_dists) + list(__med_t_dists) + list(__long_dists)
+# Y_triplet = list(__short_t_energies) + list(__med_t_energies) + list(__long_t_energies)
+# F_triplet_short = [t_a + short_t_b * r ** -t_ns for r in __short_t_dists]
+# F_triplet_med = [calc_energy(r, t_terms, t_coefs, t_b * t_rm, t_rm) for r in __med_t_dists]
 F_triplet_long = [long_energy(r, u_inf, c6, c8, c10, -aexc, gamma, beta) for r in __long_dists]
-F_triplet = F_triplet_short + F_triplet_med + F_triplet_long
+# F_triplet = F_triplet_short + F_triplet_med + F_triplet_long
 
-figure1 = plot.figure()
-plot.title("Short range")
-plot.plot(__short_s_dists, __short_s_energies, label = "Expected singlet")
-plot.plot(__short_s_dists, F_singlet_short, label = "Fit singlet")
-plot.plot(__short_t_dists, __short_t_energies, label = "Expected triplet")
-plot.plot(__short_t_dists, F_triplet_short, label = "Fit triplet")
-plot.xlabel("Li-Li Distance (å)")
-plot.ylabel("Relative Energy (Eh)")
-plot.legend()
+# figure1 = plot.figure()
+# plot.title("Short range")
+# plot.plot(__short_s_dists, __short_s_energies, label = "Expected singlet")
+# plot.plot(__short_s_dists, F_singlet_short, label = "Fit singlet")
+# plot.plot(__short_t_dists, __short_t_energies, label = "Expected triplet")
+# plot.plot(__short_t_dists, F_triplet_short, label = "Fit triplet")
+# plot.xlabel("Li-Li Distance (å)")
+# plot.ylabel("Relative Energy (Eh)")
+# plot.legend()
 
-figure2 = plot.figure()
-plot.title("Medium range")
-plot.plot(__med_s_dists, __med_s_energies, label = "Expected singlet")
-plot.plot(__med_s_dists, F_singlet_med, label = "Fit singlet")
-plot.plot(__med_t_dists, __med_t_energies, label = "Expected triplet")
-plot.plot(__med_t_dists, F_triplet_med, label = "Fit triplet")
-plot.xlabel("Li-Li Distance (å)")
-plot.ylabel("Relative Energy (Eh)")
-plot.legend()
+# figure2 = plot.figure()
+# plot.title("Medium range")
+# plot.plot(__med_s_dists, __med_s_energies, label = "Expected singlet")
+# plot.plot(__med_s_dists, F_singlet_med, label = "Fit singlet")
+# plot.plot(__med_t_dists, __med_t_energies, label = "Expected triplet")
+# plot.plot(__med_t_dists, F_triplet_med, label = "Fit triplet")
+# plot.xlabel("Li-Li Distance (å)")
+# plot.ylabel("Relative Energy (Eh)")
+# plot.legend()
 
 figure3 = plot.figure()
 plot.title("Long range")
@@ -493,12 +564,12 @@ plot.xlabel("Li-Li Distance (å)")
 plot.ylabel("Relative Energy (Eh)")
 plot.legend()
 
-figure4 = plot.figure()
-plot.plot(X_singlet, Y_singlet, label = "Expected singlet")
-plot.plot(X_singlet, F_singlet, label = "Fit singlet")
-plot.plot(X_triplet, Y_triplet, label = "Expected triplet")
-plot.plot(X_triplet, F_triplet, label = "Fit triplet")
-plot.xlabel("Li-Li Distance (å)")
-plot.ylabel("Relative Energy (Eh)")
-plot.legend()
+# figure4 = plot.figure()
+# plot.plot(X_singlet, Y_singlet, label = "Expected singlet")
+# plot.plot(X_singlet, F_singlet, label = "Fit singlet")
+# plot.plot(X_triplet, Y_triplet, label = "Expected triplet")
+# plot.plot(X_triplet, F_triplet, label = "Fit triplet")
+# plot.xlabel("Li-Li Distance (å)")
+# plot.ylabel("Relative Energy (Eh)")
+# plot.legend()
 plot.show()
