@@ -88,8 +88,8 @@ $(addprefix $(OBJDIR)/,$(pair_state_DEPS)): pair_state.mod $(OBJDIR)/pair_state_
 physical_constants_DEPS = base9-1S_3Sigma_cpld.o                               \
       base9-alk_alk_ucpld.o bd.driver.o chckru.o eavg.o ecnv.o                 \
       extpot-Ar_CH4.o extpot-Ar_CO2.o extpot-Rg_HX.o fld.driver.o              \
-      Hannover_module.o Hdata-Rb2-2010.o Hdata-K2-2020.o mol.driver.o surbas.o                 \
-      vstar-Hannover.o
+      Hannover_module.o Hdata-Rb2-2010.o Hdata-K2-2020.o Hdata-Li2-2025.o \
+      mol.driver.o surbas.o vstar-Hannover.o
 
 $(addprefix $(OBJDIR)/,$(physical_constants_DEPS)): physical_constants.mod $(OBJDIR)/physical_constants_module.o
 
@@ -118,7 +118,7 @@ $(addprefix $(OBJDIR)/,$(sizes_DEPS)): sizes.mod $(OBJDIR)/sizes_module.o
 # the object files in the list of prerequisites.
 #
 # Object codes that reference the pot_data_hannover module
-pot_data_hannover_DEPS = Hdata-Rb2-2010.o Hdata-K2-2020.o vstar-Hannover.o
+pot_data_hannover_DEPS = Hdata-Rb2-2010.o Hdata-K2-2020.o Hdata-Li2-2025.o vstar-Hannover.o
 
 $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDIR)/Hannover_module.o
 
@@ -236,6 +236,7 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
  
  DATA-RB2-Hann-2010 = Hdata-Rb2-2010.o
  DATA-K2-Hann-2020 = Hdata-K2-2020.o
+ DATA-LI2-Hann-2025 = Hdata-Li2-2025.o
  
  EXTPOT-Rg+HX     = extpot-Rg_HX.o $(DAMP) $(SUMLEG)
  
@@ -248,6 +249,7 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
  
  POT-RB2_Hann-2010 = $(POTENL-GP) $(V-Hann) $(DATA-RB2-Hann-2010)
  POT-K2_Hann-2020 = $(POTENL-GP) $(V-Hann) $(DATA-K2-Hann-2020)
+ POT-LI2_Hann-2025 = $(POTENL-GP) $(V-Hann) $(DATA-LI2-Hann-2025)
 
 #
 # dependency lists for plug-in basis-set suites ===============================
@@ -287,6 +289,12 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
                        $(POT-K2_Hann-2020)
  field-K2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
                        $(POT-K2_Hann-2020)
+ molscat-Li2_OBJS    = $(CORE_MOL) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-LI2_Hann-2025)
+ bound-Li2_OBJS      = $(CORE_BD)  $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-LI2_Hann-2025)
+ field-Li2_OBJS      = $(CORE_FLD) $(REPLACEABLE) $(BASE9-ALK-ALK-UCPLD) \
+                       $(POT-LI2_Hann-2025)
 #
 # list of executables
 #
@@ -298,7 +306,8 @@ $(addprefix $(OBJDIR)/,$(pot_data_hannover_DEPS)): pot_data_hannover.mod $(OBJDI
                 molscat-Rg_H2 bound-Rg_H2 \
                 molscat-Mg_NH bound-Mg_NH field-Mg_NH \
                 molscat-Rb2 bound-Rb2 field-Rb2 \
-                molscat-K2 bound-K2 field-K2
+                molscat-K2 bound-K2 field-K2 \
+                molscat-Li2 bound-Li2 field-Li2
  
  PROGS += $(PUBLIC-PROGS)
 

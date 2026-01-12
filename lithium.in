@@ -1,0 +1,65 @@
+molecule sLi {
+0 1
+Li
+Li 1 15.5
+units bohr
+}
+
+molecule tLi {
+0 3
+Li
+Li 1 15.5
+units bohr
+}
+
+set reference rohf
+set scf_type pk
+
+set psimrcc {
+    corr_wfn ccsd_t
+    frozen_docc [0, 0, 0, 0, 0, 0, 0, 0]
+    restricted_docc [1, 0, 0, 0, 0, 1, 0, 0]
+    active [1, 0, 0, 0, 0, 1, 0, 0]
+    frozen_uocc [0, 0, 0, 0, 0, 0, 0, 0]
+    wfn_sym B1u
+    corr_multp 1
+}
+
+singlet = energy("psimrcc/cc-pVTZ", molecule = tLi)
+print(f"Singlet (1Sigma+u) energy: {singlet * 219474.6}")
+
+set psimrcc {
+    corr_wfn ccsd_t
+    frozen_docc [0, 0, 0, 0, 0, 0, 0, 0]
+    restricted_docc [1, 0, 0, 0, 0, 1, 0, 0]
+    active [1, 0, 0, 0, 0, 1, 0, 0]
+    frozen_uocc [0, 0, 0, 0, 0, 0, 0, 0]
+    wfn_sym B1u
+    corr_multp 3
+}
+triplet = energy("psimrcc/cc-pVTZ", molecule = tLi)
+print(f"Triplet (3Sigma+u) energy: {triplet * 219474.6}")
+
+set reference rhf
+
+set psimrcc {
+    corr_wfn ccsd_t
+    frozen_docc [0, 0, 0, 0, 0, 0, 0, 0]
+    restricted_docc [1, 0, 0, 0, 0, 1, 0, 0]
+    active [1, 0, 0, 0, 0, 1, 0, 0]
+    frozen_uocc [0, 0, 0, 0, 0, 0, 0, 0]
+    wfn_sym Ag
+    corr_multp 1
+}
+singlet2 = energy("psimrcc/cc-pVTZ", molecule = sLi)
+print(f"Singlet (1Sigma+g) energy: {singlet2 * 219474.6}")
+
+ground = min(singlet, triplet, singlet2)
+
+print(f"Ground state energy: {min(singlet, triplet, singlet2) * 219474.6}")
+
+print(f"Relative 1Sigma+u energy: {(singlet - ground) * 219474.6}")
+print(f"Relative 3Sigma+u energy: {(triplet - ground) * 219474.6}")
+print(f"Relative 1Sigma+g energy: {(singlet2 - ground) * 219474.6}")
+
+print(f"Singlet-triplet gap: {(singlet - triplet) * 219474.6}")

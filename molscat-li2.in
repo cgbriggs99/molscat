@@ -2,13 +2,13 @@
     LABEL  =  '7Li-7Li elastic pole characterisation in aa channel',
     URED   =  3.508001717,
     IPRINT =   6,
-    RMIN   =   5,  RMID   =  30,   RMAX   = 8000, IRMSET = 1,
+    RMIN   =   4,  RMID   =  15,   RMAX   = 8000, IRMSET = 1,
     IPROPS =   8,    DR     =   0.002,
     IPROPL =   9,    TOLHIL =   1.E-9,
     JTOTL  =   4,    JTOTU  =   4, JSTEP = 2, IBFIX = 2,
     EUNITS =   2,    NNRG   =   1,     ENERGY =  1.E-7,
                      DTOL   =   1.E-6, MONQN  =  2,2,2,2,
-    FLDMIN = 740, FLDMAX = 780, DFIELD = 0.05,
+    FLDMIN = 500, FLDMAX = 2000 , ! DFIELD = 0.05,
  /
 
  &BASIS
