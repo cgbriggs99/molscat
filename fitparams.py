@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import scipy
+import scipy.odr
 import matplotlib.pyplot as plot
 import gc
 
@@ -94,34 +95,34 @@ def find_min_terms(start, dists, energies, guess_b, guess_rm, cutoff = 1e-8, con
             terms += 1
             continue
 
-def short_loss(dists, energies, a, b, ns) :
-    return sum((a + b / (r ** ns) - e) ** 2 for r, e in zip(dists, energies)) / len(dists)
+def short_loss(dists, energies, a, b, ns, alpha) :
+    return sum((a + b / (r ** ns) * math.exp(-alpha * r) - e) ** 2 for r, e in zip(dists, energies)) / len(dists)
 
-def short_energy(r, a, b, ns) :
-    return a + b / (r ** ns)
+def short_energy(r, a, b, ns, alpha) :
+    return a + b / (r ** ns) * math.exp(-alpha * r)
 
 def short_all_func(dists, energies, x) :
     num_dists = sum(1 if d <= x[0] else 0 for d in dists)
 
-    return short_loss(dists[:num_dists], energies[:num_dists], x[1], x[2], x[3])
+    return short_loss(dists[:num_dists], energies[:num_dists], x[1], x[2], x[3], x[4])
 
-def short_optimize_all(dists, energies, a_start, b_start, ns_start) :
+def short_optimize_all(dists, energies, a_start, b_start, ns_start, alpha_start) :
     # a_start, b_start = short_find_ab(method, molecule, rin_start, e_inf, ns_start, 1e-2)
     # a_start = -0.2600158561e4 / 219474.6
     # b_start = 0.8053173040e9 / 219474.6
 
-    result = scipy.optimize.least_squares(lambda x: [short_energy(r, x[0], x[1], x[2]) - e for r, e in zip(dists, energies)], [a_start, b_start, ns_start])
+    result = scipy.optimize.least_squares(lambda x: [short_energy(r, x[0], x[1], x[2], x[3]) - e for r, e in zip(dists, energies)], [a_start, b_start, ns_start, alpha_start])
 
     if not result.success :
         raise RuntimeError("Could not optimize parameters!")
-    return result.x[0], result.x[1], result.x[2]
+    return result.x[0], result.x[1], result.x[2], result.x[3]
 
 def long_loss(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
     return (sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, singlet)) / len(dists) + \
         sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 - aexc * r ** gamma * math.exp(-beta * r) - e) ** 2 for r, e in zip(dists, triplet)) / len(dists)) / sstot
 
-def long_energy(r, u_inf, c6, c8, c10, aexc, gamma, beta) :
-    return u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r)
+def long_energy(r, u_inf, c6, c8, c10, aexc, gamma, beta, nex = 0, cex = 0) :
+    return u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - cex * r ** -nex
 
 def long_u_inf_deriv(dists, singlet, triplet, u_inf, c6, c8, c10, aexc, gamma, beta, sstot = 1) :
     return (2 * sum((u_inf - c6 * r ** -6 - c8 * r ** -8 - c10 * r ** -10 + aexc * r ** gamma * math.exp(-beta * r) - e) for r, e in zip(dists, singlet)) / len(dists) + \
@@ -160,36 +161,201 @@ def long_deriv(dists, singlet, triplet, x, sstot = 1) :
             long_beta_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot),
             long_u_inf_deriv(dists, singlet, triplet, x[6], x[0], x[1], x[2], x[3], x[4], x[5], sstot)]
 
-def long_find_disp(dists, triplet) :
-    coef_matrix = np.zeros([3, 3])
-    res_matrix = np.zeros([3])
+def ssor(coefs, results, omega = 1, conv = 1e-8, maxiter = 1000, max_diis_vectors = 10) :
+    diis_vectors = []
+    stored_vectors = []
 
-    coef_matrix[0, 0] = 2 * sum(-1 / r ** 12 for r in dists)
-    coef_matrix[0, 1] = coef_matrix[1, 0] = 2 * sum(-1 / r ** 14 for r in dists)
-    coef_matrix[0, 2] = coef_matrix[2, 0] = 2 * sum(-1 / r ** 16 for r in dists)
-    coef_matrix[1, 1] = 2 * sum(-1 / r ** 16 for r in dists)
-    coef_matrix[1, 2] = coef_matrix[2, 1] = 2 * sum(-1 / r ** 18 for r in dists)
-    coef_matrix[2, 2] = 2 * sum(-1 / r ** 20 for r in dists)
+
+
+    x0 = np.zeros_like(results)
+    z = x0
+
+    L = np.zeros_like(coefs)
+    D = np.zeros_like(coefs)
+
+    for i in range(coefs.shape[0]) :
+        D[i, i] = coefs[i, i]
+
+    for i in range(coefs.shape[0]) :
+        for j in range(i) :
+            L[i, j] = coefs[i, j]
+    
+    precon = omega / (2 - omega) * (D / omega + L) @ np.linalg.inv(D) @ (D / omega + L).T
+
+    print(f"Preconditioner condition number: {np.linalg.cond(precon, 2)}")
+    print("Iter    Error   ")
+    print("------------------------")
+
+    cycles = 0
+
+    r = results - coefs @ x0
+
+    diis_vectors.append(r)
+    stored_vectors.append(x0)
+
+    z = np.linalg.solve(precon, r)
+
+    x0 += z
+
+    while np.linalg.norm(z) / np.linalg.norm(x0) > conv and cycles < maxiter :
+        cycles += 1
+
+        print(f"{cycles:<8d}{np.linalg.norm(z) / np.linalg.norm(x0): 16e}")
+        print(x0)
+
+        r = results - coefs @ x0
+
+        z = np.linalg.solve(precon, r)
+
+        x0 += z
+
+        if len(diis_vectors) < max_diis_vectors :
+            diis_vectors.append(r)
+            stored_vectors.append(x0)
+        else :
+            max_error = 0
+            max_index = 0
+            for i in range(len(diis_vectors)) :
+                error = np.dot(diis_vectors[i], r)
+                if error > max_error :
+                    max_error = error
+                    max_index = i
+            diis_vectors[max_index] = r
+            stored_vectors[max_index] = r
+
+        if len(diis_vectors) > 1 :
+            diis_coefs = np.zeros([len(diis_vectors) + 1, len(diis_vectors) + 1])
+
+            for i in range(len(diis_vectors)) :
+                for j in range(i, len(diis_vectors)) :
+                    overlap = np.dot(diis_vectors[i], diis_vectors[j])
+                    diis_coefs[i, j] = overlap
+                    diis_coefs[j, i] = overlap
+            for i in range(len(diis_vectors)) :
+                diis_coefs[i, -1] = -1
+                diis_coefs[-1, i] = -1
+            diis_results = np.zeros(len(diis_vectors) + 1)
+            diis_results[-1] = 1
+            try :
+                diis_solution = np.linalg.solve(diis_coefs, diis_results)
+                xtemp = sum(coef * vec for coef, vec in zip(diis_solution, stored_vectors))
+                x0 = xtemp
+            except np.linalg.LinAlgError :
+                diis_vectors = []
+                stored_vectors = []
+    if np.linalg.norm(z) / np.linalg.norm(x0) > conv :
+        raise ArithmeticError("Could not converge Symmetric Successive Over-relaxation iterations!")
+    return x0
+
+def long_find_disp(dists, triplet, nex) :
+    coef_matrix = np.zeros([4, 4])
+    res_matrix = np.zeros([4])
+    if nex == 0 :
+        coef_matrix = np.zeros([3, 3])
+        res_matrix = np.zeros([3])
+
+    coef_matrix[0, 0] = sum(-1 / r ** 12 for r in dists)
+    coef_matrix[0, 1] = coef_matrix[1, 0] = sum(-1 / r ** 14 for r in dists)
+    coef_matrix[0, 2] = coef_matrix[2, 0] = sum(-1 / r ** 16 for r in dists)
+    coef_matrix[1, 1] = sum(-1 / r ** 16 for r in dists)
+    coef_matrix[1, 2] = coef_matrix[2, 1] = sum(-1 / r ** 18 for r in dists)
+    coef_matrix[2, 2] = sum(-1 / r ** 20 for r in dists)
+
+    if nex != 0 :
+        coef_matrix[0, 3] = coef_matrix[3, 0] = sum(-1 / r ** (6 + nex) for r in dists)
+        coef_matrix[1, 3] = coef_matrix[3, 1] = sum(-1 / r ** (8 + nex) for r in dists)
+        coef_matrix[2, 3] = coef_matrix[3, 2] = sum(-1 / r ** (10 + nex) for r in dists)
+        coef_matrix[3, 3] = sum(-1 / r ** (2 * nex) for r in dists)
 
     res_matrix[0] = sum(e / r ** 6 for r, e in zip(dists, triplet))
     res_matrix[1] = sum(e / r ** 8 for r, e in zip(dists, triplet))
-    res_matrix[2] = sum(e / r ** 8 for r, e in zip(dists, triplet))
+    res_matrix[2] = sum(e / r ** 10 for r, e in zip(dists, triplet))
 
-    return np.linalg.solve(coef_matrix, res_matrix)
+    if nex != 0 :
+        res_matrix[3] = sum(e / r ** nex for r, e in zip(dists, triplet))
+
+    precon = np.zeros_like(coef_matrix)
+
+    precon[0, 0] = 1 / coef_matrix[0, 0]
+    precon[1, 1] = 1 / coef_matrix[1, 0]
+    precon[2, 2] = 1 / coef_matrix[2, 0]
+
+    if nex != 0 :
+        precon[3, 3] = 1 / coef_matrix[3, 0]
+
+    coef_matrix = precon @ coef_matrix
+    res_matrix = precon @ res_matrix
+
+    condition_number = np.linalg.cond(coef_matrix, 2)
+
+    return np.linalg.lstsq(coef_matrix, res_matrix)[0]
+
+def long_find_exch(dists, data, A, gamma, beta) :
+    sign = 1 if sum(data) > 0 else -1
+
+    #return [sign * math.exp(sum(math.log(abs(e)) - gamma * math.log(r) + beta * r for r, e in zip(dists, data)) / len(dists)), gamma, beta]
+    coef_matrix = np.zeros([3, 3])
+    res_matrix = np.zeros([3])
+
+    coef_matrix[0, 0] = len(dists)
+    coef_matrix[0, 1] = sum(math.log(d) for d in dists)
+    coef_matrix[0, 2] = -sum(dists)
+    coef_matrix[1, 0] = sum(math.log(d) for d in dists)
+    coef_matrix[1, 1] = sum(math.log(d) ** 2 for d in dists)
+    coef_matrix[1, 2] = -sum(d * math.log(d) for d in dists)
+    coef_matrix[2, 0] = sum(dists)
+    coef_matrix[2, 1] = sum(d * math.log(d) for d in dists)
+    coef_matrix[2, 2] = -sum(d ** 2 for d in dists)
+
+    res_matrix[0] = sum(math.log(abs(e)) for d, e in zip(dists, data))
+    res_matrix[1] = sum(math.log(d) * math.log(abs(e)) for d, e in zip(dists, data))
+    res_matrix[2] = sum(d * math.log(abs(e)) for d, e in zip(dists, data))
+
+    condition_number = np.linalg.cond(coef_matrix, 2)
+
+    sol = np.linalg.solve(coef_matrix, res_matrix)
+
+    return [sign * math.exp(sol[0]), gamma, beta]
 
 def long_func(dists, singlet, triplet, aexc, gamma, beta) :
     coefs = long_find_disp(dists, singlet, triplet, aexc, gamma, beta)
     return long_loss(dists, singlet, triplet, 0, coefs[0], coefs[1], coefs[2], aexc, gamma, beta)
         
-def long_calc_params(dists, singlet, triplet, singlet_binding, ionization) :
+def long_calc_params(dists, singlet, triplet, singlet_binding, ionization, nex_min = 0, nex_max = 0) :
+    sum_data = [(s + t) / 2 for s, t in zip(singlet, triplet)]
+    diff_data = [(s - t) / 2 for s, t in zip(singlet, triplet)]
+
 
     # least-squares fitting to a polynomial.
-    guess_c10 = long_find_disp(dists, triplet)
+    
+    guess_c10 = long_find_disp(dists, sum_data, 0)
+    
+    if nex_min != nex_max or nex_min != 0 :
+        nex_found = 0
+        max_cex = 0
+        average = sum(sum_data) / len(sum_data)
+        sstot = (sum((e - average) ** 2 for e in sum_data)) / len(sum_data)
+        max_rsquare = 1 - sum((long_energy(r, 0, guess_c10[0], guess_c10[1], guess_c10[2],  0, 0, 0) - e) ** 2 for r, e in zip(dists, sum_data)) / sstot
 
-    res_c10 = scipy.optimize.least_squares(lambda x: [long_energy(r, 0, x[0], x[1], x[2], 0, 0, 0) - e for r, e in zip(dists, triplet)] + [long_energy(r, 0, x[0], x[1], x[2], 0, 0, 0) - e for r, e in zip(dists, singlet)], guess_c10)
+        print(f"Nex: 0, R^2: {max_rsquare}")
+        
+        for nex in range(nex_min, nex_max + 1) :
+            guess_c10 = long_find_disp(dists, sum_data, nex)
+            sstot = (sum((e - average) ** 2 for e in sum_data)) / len(sum_data)
+            rsquare = 1 - sum((long_energy(r, 0, guess_c10[0], guess_c10[1], guess_c10[2],  0, 0, 0, nex = nex, cex = guess_c10[3]) - e) ** 2 for r, e in zip(dists, sum_data)) / sstot
+            print(f"Nex: {nex}, R^2: {rsquare}")
+            if rsquare > max_rsquare :
+                max_rsquare = rsquare
+                nex_found = nex
+                max_cex = guess_c10[3]
 
-    if res_c10.success :
-       guess_c10 = res_c10.x 
+            
+
+
+    # res_c10 = scipy.optimize.least_squares(lambda x: [long_energy(r, 0, x[0], x[1], x[2], 0, 0, 0) - e for r, e in zip(dists, sum_data)], guess_c10)
+
+    # if res_c10.success :
+    #    guess_c10 = res_c10.x 
     
     # https://doi.org/10.1016/0009-2614(95)01388-1.
     gamma = 7.0 / (2.0 * math.sqrt(ionization * 2))
@@ -199,17 +365,29 @@ def long_calc_params(dists, singlet, triplet, singlet_binding, ionization) :
 
     A = ((2 * b) ** (1 / b) * math.sqrt(b) / math.gamma(1 / b + 1)) ** 4 * math.gamma(1 / (2 * b)) * 2 ** (-1 - 1 / b) * b ** (-2 - 1 / (2 * b)) * scipy.integrate.quad(lambda y: math.exp((y - 1) / b) * (1 - y) ** (3 / (2 * b)) * (1 + y) ** (1 / (2 * b)), 0, 1)[0]
 
-    guess_x = [guess_c10[0], guess_c10[1], guess_c10[2], A, math.sqrt(gamma), math.sqrt(beta)]
+    guess_x = long_find_exch(dists, diff_data, A, gamma, beta) # [A, math.sqrt(gamma), math.sqrt(beta)]
+    guess_x[1] = math.sqrt(guess_x[1])
+    guess_x[2] = math.sqrt(guess_x[2])
     print(f"Guess: {guess_x}")
+    # print(f"Calculated: {guess_x}")
 
-    res = scipy.optimize.least_squares(lambda x: [long_energy(r, 0, x[0], x[1], x[2], -x[3], x[4] ** 2, x[5] ** 2) - e for r, e in zip(dists, triplet)] + [long_energy(r, 0, x[0], x[1], x[2], x[3], x[4] ** 2, x[5] ** 2) - e for r, e in zip(dists, singlet)], guess_x)
+    # model = scipy.odr.Model(lambda x, pts: np.array([long_energy(r, 0, 0, 0, 0, x[0], x[1] ** 2, x[2] ** 2) for r in pts]))
+    # data = scipy.odr.Data(dists, diff_data)
+    # odr_run = scipy.odr.ODR(data, model, beta0 = guess_x)
+
+    # res = odr_run.run()
+
+    res = scipy.optimize.least_squares(lambda x: [long_energy(r, 0, 0, 0, 0, x[0], x[1] ** 2, x[2] ** 2) - e for r, e in zip(dists, diff_data)], guess_x)
     if not res.success :
         raise ArithmeticError("Could not converge third pass!")
     print(f"Optimized: {res.x}")
-    res.x[4] = res.x[4] ** 2
-    res.x[5] = res.x[5] ** 2
-    return res.x
-        
+    res.x[1] = res.x[1] ** 2
+    res.x[2] = res.x[2] ** 2
+    # res.pprint()
+    print(f"Calculated: {res.x}")
+    if nex_min == 0 and nex_min == nex_max :
+        return [guess_c10[0], guess_c10[1], guess_c10[2], res.x[0], res.x[1], res.x[2]]
+    return [guess_c10[0], guess_c10[1], guess_c10[2], res.x[0], res.x[1], res.x[2], nex_found, max_cex]
 
 # First, calculate the energy at infinite separation.
 mr_method = "ci6"
@@ -320,7 +498,7 @@ for idx, dist in enumerate(__short_s_dists) :
     #     E = energy(mr_method, molecule = sLi2) - E_inf_s
     __short_s_energies.append(E)
 
-s_a, short_s_b, s_ns = short_optimize_all(__short_s_dists, __short_s_energies, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632)
+s_a, short_s_b, s_ns, s_alpha = short_optimize_all(__short_s_dists, __short_s_energies, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, 0)
 
 gc.collect()
 
@@ -334,7 +512,8 @@ print(f"Rin (å): {s_rin}")
 print(f"A (cm^-1): {219474.6 * s_a}")
 print(f"B (cm^-1 å^Ns): {219474.6 * short_s_b}")
 print(f"Ns: {s_ns}")
-print(f"R^2 fit: {1 - short_loss(__short_s_dists, __short_s_energies, s_a, short_s_b, s_ns) / sstot}")
+print(f"alpha (å^-1): {s_alpha}")
+print(f"R^2 fit: {1 - short_loss(__short_s_dists, __short_s_energies, s_a, short_s_b, s_ns, s_alpha) / sstot}")
 
 print("Calculating singlet medium range: ")
 
@@ -472,7 +651,7 @@ for idx, dist in enumerate(__short_t_dists) :
     #     E = energy(mr_method, molecule = tLi2) - E_inf_t
     __short_t_energies.append(E)
 
-t_a, short_t_b, t_ns = short_optimize_all(__short_t_dists, __short_t_energies, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632)
+t_a, short_t_b, t_ns, t_alpha = short_optimize_all(__short_t_dists, __short_t_energies, -167163.9313131849 / 219474.6, 227086.33338132472 / 219474.6, 1.4987380566420632, 0)
 
 gc.collect()
 
@@ -486,7 +665,8 @@ print(f"Rin (å): {t_rin}")
 print(f"A (cm^-1): {219474.6 * t_a}")
 print(f"B (cm^-1 å^Ns): {219474.6 * short_t_b}")
 print(f"Ns: {t_ns}")
-print(f"R^2 fit: {1 - short_loss(__short_t_dists, __short_t_energies, t_a, short_t_b, t_ns) / sstot}")
+print(f"alpha (å^-1): {t_alpha}")
+print(f"R^2 fit: {1 - short_loss(__short_t_dists, __short_t_energies, t_a, short_t_b, t_ns, t_alpha) / sstot}")
 
 print("Calculating triplet medium range: ", flush=True)
 __med_t_dists = np.linspace(t_rin, rout, 50)
@@ -564,12 +744,24 @@ sstot = (sum((e - average_t) ** 2 for e in __long_t_energies) + sum((e - average
 
 u_inf = 0
 
-[c6, c8, c10, aexc, gamma, beta] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies, ionization, ionization)
+[c6, c8, c10, aexc, gamma, beta, nex, cex] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies, ionization, ionization, nex_min = 10, nex_max = 30)
 
+
+
+print(f"U_inf (Eh): {u_inf}")
+print(f"C6 (Eh bohr^6): {c6 / 0.529177249 ** 6}")
+print(f"C8 (Eh bohr^8): {c8 / 0.529177249 ** 8}")
+print(f"C10 (Eh bohr^10): {c10 / 0.529177249 ** 10}")
+if nex != 0 :
+    print(f"Cex (Eh bohr^{nex}): {cex / 0.529177249 ** nex}")
+print(f"Aexc (Eh): {aexc}")
 print(f"U_inf (cm^-1): {219474.6 * u_inf}")
 print(f"C6 (cm^-1 å^6): {219474.6 * c6}")
 print(f"C8 (cm^-1 å^8): {219474.6 * c8}")
 print(f"C10 (cm^-1 å^10): {219474.6 * c10}")
+if nex != 0 :
+    print(f"Nex: {nex}")
+    print(f"Cex (cm^-1 å^{nex}): {219474.6 * cex}")
 print(f"Aexc (cm^-1): {219474.6 * aexc}")
 print(f"gamma (dimensionless): {gamma}")
 print(f"beta (å^-1): {beta}")
@@ -580,25 +772,25 @@ print(f"R^2 fit: {1 - long_loss(__long_dists, __long_s_energies, __long_t_energi
 #Plotting
 X_singlet = list(__short_s_dists) + list(__med_s_dists) + list(__long_dists)
 Y_singlet = list(__short_s_energies) + list(__med_s_energies) + list(__long_s_energies)
-F_singlet_short = [s_a + short_s_b * r ** -s_ns for r in __short_s_dists]
+F_singlet_short = [s_a + short_s_b * r ** -s_ns * math.exp(-s_alpha * r) for r in __short_s_dists]
 F_singlet_med = [calc_energy(r, terms, coefs, b * rm, rm) for r in __med_s_dists]
 F_singlet_long = [long_energy(r, u_inf, c6, c8, c10, aexc, gamma, beta) for r in __long_dists]
 F_singlet = F_singlet_short + F_singlet_med + F_singlet_long
 
-print("Singlet surface:")
-for x, y in zip(X_singlet, Y_singlet) :
-    print(f"{x}, {y}")
+# print("Singlet surface:")
+# for x, y in zip(X_singlet, Y_singlet) :
+#     print(f"{x}, {y}")
 
 X_triplet = list(__short_t_dists) + list(__med_t_dists) + list(__long_dists)
 Y_triplet = list(__short_t_energies) + list(__med_t_energies) + list(__long_t_energies)
-F_triplet_short = [t_a + short_t_b * r ** -t_ns for r in __short_t_dists]
+F_triplet_short = [t_a + short_t_b * r ** -t_ns * math.exp(-t_alpha * r) for r in __short_t_dists]
 F_triplet_med = [calc_energy(r, t_terms, t_coefs, t_b * t_rm, t_rm) for r in __med_t_dists]
 F_triplet_long = [long_energy(r, u_inf, c6, c8, c10, -aexc, gamma, beta) for r in __long_dists]
 F_triplet = F_triplet_short + F_triplet_med + F_triplet_long
 
-print("Triplet surface:")
-for x, y in zip(X_triplet, Y_triplet) :
-    print(f"{x}, {y}")
+# print("Triplet surface:")
+# for x, y in zip(X_triplet, Y_triplet) :
+#     print(f"{x}, {y}")
 
 figure1 = plot.figure()
 plot.title("Short range")
