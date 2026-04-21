@@ -744,7 +744,7 @@ sstot = (sum((e - average_t) ** 2 for e in __long_t_energies) + sum((e - average
 
 u_inf = 0
 
-[c6, c8, c10, aexc, gamma, beta, nex, cex] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies, ionization, ionization, nex_min = 10, nex_max = 30)
+[c6, c8, c10, aexc, gamma, beta, nex, cex] = long_calc_params(__long_dists, __long_s_energies, __long_t_energies, ionization, ionization, nex_min = 2, nex_max = 30)
 
 
 

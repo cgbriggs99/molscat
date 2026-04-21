@@ -34,28 +34,40 @@ def find_values(fp, channel) :
     return
 
 def plot_file(fname, channel) :
-    data = []
+    unfiltered_data = []
     with open(fname, "r") as fp :
-        data = list(find_values(fp, channel))
-    print(data)
-    X = [d[0] for d in data]
-    Y1 = [d[4] for d in data]
-    Y2 = [d[5].real for d in data]
-    Y3 = [d[5].imag for d in data]
-    Y4 = [abs(d[5]) for d in data]
-    figure1 = plot.figure()
-    plot.title("Wvec")
-    plot.plot(X, Y1, label = "Wvec")
-    figure2 = plot.figure()
-    plot.title("re(A)")
-    plot.plot(X, Y2, label = "re(A)")
-    figure3 = plot.figure()
-    plot.title("im(A)")
-    plot.plot(X, Y3, label = "im(A)")
-    figure4 = plot.figure()
-    plot.title("|A|")
-    plot.plot(X, Y4, label = "|A|")
-    plot.show()
+        unfiltered_data = list(find_values(fp, channel))
+    # Remove duplicates
+    data_sets = [[]]
+    for point in unfiltered_data :
+        if len(data_sets[-1]) > 0 and point[0] < data_sets[-1][-1][0] :
+            data_sets.append([])
+        else :
+            data_sets[-1].append(point)
+
+    data_sets = [list(sorted(d, key = lambda x: x[0])) for d in data_sets]
+    print(data_sets)
+
+    for n, data in enumerate(data_sets) :
+        print(f"Showing data-set {n + 1}")
+        X = [d[0] for d in data]
+        Y1 = [d[4] for d in data]
+        Y2 = [d[5].real for d in data]
+        Y3 = [d[5].imag for d in data]
+        Y4 = [abs(d[5]) for d in data]
+        figure1 = plot.figure()
+        plot.title("Wvec")
+        plot.plot(X, Y1, ".-", label = "Wvec")
+        figure2 = plot.figure()
+        plot.title("re(A)")
+        plot.plot(X, Y2, ".-", label = "re(A)")
+        figure3 = plot.figure()
+        plot.title("im(A)")
+        plot.plot(X, Y3, ".-", label = "im(A)")
+        figure4 = plot.figure()
+        plot.title("|A|")
+        plot.plot(X, Y4, ".-", label = "|A|")
+        plot.show()
 
 def main() :
     parser = argparse.ArgumentParser("Plot the contents of a molscat output.")

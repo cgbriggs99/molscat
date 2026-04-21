@@ -8,7 +8,7 @@
     JTOTL  =   4,    JTOTU  =   4, JSTEP = 2, IBFIX = 2,
     EUNITS =   2,    NNRG   =   1,     ENERGY =  1.E-7,
                      DTOL   =   1.E-6, MONQN  =  2,2,2,2,
-    FLDMIN = 740, FLDMAX = 780, DFIELD = 0.05,
+    FLDMIN = 740, FLDMAX = 780, ! DFIELD = 0.05,
  /
 
  &BASIS
