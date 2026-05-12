@@ -18,7 +18,7 @@ ifneq ($(MOLSCAT_LIBS),)
   LIBS = $(MOLSCAT_LIBS)
 endif
 ifneq ($(MOLSCAT_FLAGS),)
-  FFLAGS = $(FFLAGS) $(MOLSCAT_FLAGS)
+  FFLAGS := $(FFLAGS) $(MOLSCAT_FLAGS)
 endif
 
 ifeq ($(MOLSCAT_OBJDIR),)
