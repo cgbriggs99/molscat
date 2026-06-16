@@ -2,7 +2,7 @@
     LABEL  =  '39K-39K elastic pole characterisation in aa channel',
     URED   =  19.4818532424,
     IPRINT =   6,
-    RMIN   =   5,  RMID   =  30,   RMAX   = 8000, IRMSET = 1,
+    RMIN   =   5,  RMID   =  30,   RMAX   = 8000, IRMSET = 0,
     IPROPS =   8,    DR     =   0.002,
     IPROPL =   9,    TOLHIL =   1.E-9,
     JTOTL  =   4,    JTOTU  =   4, JSTEP = 2, IBFIX = 2,
@@ -22,7 +22,7 @@
     HFSPLA = +0.4617197202,
     GA     = -1.419348912E-4,
     INUCB  =  -1, ! -1 means the nuclei are identical.
-    LMAX   =  2,
+    LMAX   =  4,
     ISPSP  = 0,
  /
 
